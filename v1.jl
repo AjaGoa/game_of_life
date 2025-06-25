@@ -1,17 +1,27 @@
-using GLMakie 
+using GLMakie
+fig = Figure(size = (3840, 2160))
 
-fig =  Figure(resolution = (800, 800))
-
-ax1 = fig[1, 1] = Axis(fig,
-    # borders
-    aspect = 1, targetlimits = BBox(-10, 10, -10, 10),
-    # title
+ax1 = Axis(fig[1, 1],
+    # Core settings
+    aspect = 1,
     title = "Sliders Tutorial",
-    titlegap = 48, titlesize = 60,
-    # x-axis
-    xautolimitmargin = (0, 0), xgridwidth = 2, xticklabelsize = 36,
-    xticks = LinearTicks(20), xticksize = 18,
-    # y-axis
-    yautolimitmargin = (0, 0), ygridwidth = 2, yticklabelpad = 14,
-    yticklabelsize = 36, yticks = LinearTicks(20), yticksize = 18
+    titlegap = 28,
+    titlesize = 30,
+    
+    # X-axis configuration
+    xautolimitmargin = (50, 0),
+    xgridwidth = 2,
+    xticks = False,
+    # Y-axis configuration
+    yautolimitmargin = (0, 0),
+    ygridwidth = 2,
+    yticklabelpad = 14,
+    yticklabelsize = 36,
+    yticks = LinearTicks(20),
+    yticksize = 18
 )
+
+# Set limits after Axis creation
+limits!(ax1, -20, 20, -50, 8)  # xmin, xmax, ymin, ymax
+
+fig
