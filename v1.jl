@@ -1,4 +1,5 @@
 using GLMakie
+#=
 fig = Figure(size = (3840, 2160))
 
 ax1 = Axis(fig[1, 1],
@@ -11,7 +12,7 @@ ax1 = Axis(fig[1, 1],
     # X-axis configuration
     xautolimitmargin = (50, 0),
     xgridwidth = 2,
-    xticks = False,
+
     # Y-axis configuration
     yautolimitmargin = (0, 0),
     ygridwidth = 2,
@@ -23,5 +24,18 @@ ax1 = Axis(fig[1, 1],
 
 # Set limits after Axis creation
 limits!(ax1, -20, 20, -50, 8)  # xmin, xmax, ymin, ymax
+=#
 
+
+fig = Figure(size=(600, 600))
+    
+ax = Axis(fig[1, 1], 
+        aspect=DataAspect(), 
+        title="Game of Life (10×10)", 
+        xticklabelsvisible = false, yticklabelsvisible = false, xticksvisible = false, yticksvisible = false,
+        xgridwidth = 2, ygridwidth = 2, 
+        xzoomlock = true, yzoomlock = true )
+limits!(ax, 0, 50, 0, 50)
+
+plot!(ax, rand(10, 10); colormap=:viridis, colorrange=(0, 1))
 fig

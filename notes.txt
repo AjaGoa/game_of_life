@@ -6,3 +6,5 @@ rules:
 
 
 (Cairo Makie - static so GL better)
+
+observables, listener - will be called whenever observable change
