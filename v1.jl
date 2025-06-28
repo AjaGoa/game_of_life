@@ -35,7 +35,8 @@ ax = Axis(fig[1, 1],
         xticklabelsvisible = false, yticklabelsvisible = false, xticksvisible = false, yticksvisible = false,
         xgridwidth = 2, ygridwidth = 2, 
         xzoomlock = true, yzoomlock = true )
+heatmap!(ax, bool_array, colormap=[:white, :black], colorrange=(0, 1))
 limits!(ax, 0, 50, 0, 50)
 
-plot!(ax, rand(10, 10); colormap=:viridis, colorrange=(0, 1))
+plot!(ax, rand(10, 10); )
 fig
