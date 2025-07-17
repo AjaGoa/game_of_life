@@ -8,3 +8,39 @@ rules:
 (Cairo Makie - static so GL better)
 
 observables, listener - will be called whenever observable change
+
+mit kompletni seznam bodu - mit tam aj ty mrtve 
+(mozna pocitat osa odzadu, misto rotace)
+heatmap
+glider gun
+periodicke okraje 
+    - halo - udelat navic okraje 
+    - pouzit mod (abych zjistila, kde jsem - jestli jsem uz mimo bound, dostanu vzdycky cislo mezi 1 - n)
+    - muzu pouzit posunuti indexu (OffsetArray - knihovna)
+    
+on bezi kazdy frame - udelat jeden krok simulace, muze byt libovolny pocet on (s)
+
+(pojmenovane on muzu vypnout pomoci off)
+minimalizovat globaly
+
+axis - da mi vsechny platne indexy (bez zavislosti na typu?) + prekladac je rychlejsi, protoze vi, ze je to z axis takze ok 
+
+neni potreba pouzivat observable? - staci jenom na levlu rozbrazovani
+(ctrl + lomitko)
+
+aktualne neni asi potreba observable board, stejne vytvarim novou array 
+
+heatmap / image!
+
+na zacatku namalovat zrovna puvodni matici (random) ne prazdne policka
+
+( muzu menit jenom barvy na zaklade pozice)
+
+muzu si jenom z matice vybrat body pro ktere mam true a predam je scatteru (vyzobnu pozice ktere mam true)
+
+knihovna - offsetArrays 
+
+
+NotebookLM.google 
+
+zkusit chat bot na zpetnou vazbu k mluveni :) - Gemini
