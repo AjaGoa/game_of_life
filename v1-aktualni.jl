@@ -13,7 +13,7 @@ mutable struct Board
     gens::Observable{Int}
     isrunning::Observable{Bool}
     current_gen::Observable{Int}
-    s::Observable{Int}
+    s::Int
 end
 
 function initialize()
@@ -24,7 +24,7 @@ function initialize()
         Observable(5), # gens
         Observable(false),  # isrunning
         Observable(0),  # generations
-        Observable(0)
+        0 # s
     )
 end
 
@@ -78,7 +78,7 @@ end
 function gol(b::Board)
     @async begin
     
-    target = b.gens[] + b.s[]
+    target = b.gens[] + b.s
     while b.current_gen[] < target
         if !b.isrunning[]
             break
@@ -89,7 +89,7 @@ function gol(b::Board)
         sleep(b.delay[])
     end
     if b.current_gen[] != 0 && (b.current_gen[] % target == 0)
-        b.s[] += b.gens[]  # reset generation count when reaching target
+        b.s += b.gens[]  # reset generation count when reaching target
         
     end
     b.isrunning[] = false
@@ -142,7 +142,7 @@ function make_figure(b::Board)
         b.isrunning[] = false
         b.board[] = rand(Bool, g, g)
         b.current_gen[] = 0
-        b.s[] = 0
+        b.s = 0
     end
     
     display(fig)
