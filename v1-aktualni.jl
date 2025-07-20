@@ -40,9 +40,9 @@ end
 
 function wrap_board(data::Matrix{Bool})
     g = size(data, 1)
-    ghost = OffsetArray(falses(g+2, g+2), 0:g+1, 0:g+1)
+    ghost = OffsetArray(falses(g+2, g+2), 0:g+1, 0:g+1) # zvetsena o 2 rows & cols, offset od 0 do g+1
 
-    ghost[1:g, 1:g] .= data 
+    ghost[1:g, 1:g] .= data # prepise data v "realne" casto
     # edges
     ghost[0, 1:g] .= data[end, :]      # top (ghost([puts data to row 0 = top halo, vsechny cols realne (1:g) matice) (data[last ROW, all cols])
     ghost[g+1, 1:g] .= data[1, :]      # bottom
@@ -58,6 +58,12 @@ function wrap_board(data::Matrix{Bool})
     return ghost
 end
 
+function wrap_board(data::Matrix{Bool})
+    g = size(data, 1)
+    
+    return ghost
+end
+# witcher 3x5 - Yen saty
 function next_generation!(b::Board)
     g = size(b.board[], 1)
     ghost = wrap_board(b.board[])
@@ -72,12 +78,12 @@ function next_generation!(b::Board)
         end
     end
 
-    b.board[] = copy(b.new_board) # bez copy mi to jenom odkazuje na misto v pameti ale new_board, a to potom upravuju, takze tam bude delat bordel
+    b.board, b.new_board = b.new_board, b.board # bez copy mi to jenom odkazuje na misto v pameti ale new_board, a to potom upravuju, takze tam bude delat bordel
 end
 
 function gol(b::Board)
     @async begin
-    
+    # target checkuje ze mi run/stop nevytvori novou board/nezacne pocitat od zacatku
     target = b.gens[] + b.s
     while b.current_gen[] < target
         if !b.isrunning[]
