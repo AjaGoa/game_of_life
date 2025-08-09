@@ -46,14 +46,16 @@ NotebookLM.google
 zkusit chat bot na zpetnou vazbu k mluveni :) - Gemini
 
 
-Ta kopie halo je v poradku, ale to pole se zbytecne vytvari znova. Pointa je, ze to offset array muze byt to s tema hlavnima datama, kde na platnejch indexech najdes stavu boardu, a do tech okraju si aktualizujes halo, kdyz delas dalsi iteraci.
-Tech observables mas myslim skutecne zbytecne hodne. Sice to neni formalni problem, dokud spravne pouzivas [], ale je tam nejake overhead a hlavne se to blbe pise. Observables muzou zustat jenom kolem ploteni, jinak staci plain arrays. V make_figure by sis napriklad udelala board_plot = Observable(b.board)a to potom predala do heatmap.
- 
-Aktualizace plotu je potom proste board_plot[] = b.board.
+1. Ta kopie halo je v poradku, ale to pole se zbytecne vytvari znova. 
+    Pointa je, ze to offset array muze byt to s tema hlavnima datama, kde na platnejch indexech najdes stavu boardu, a do tech okraju si aktualizujes halo, kdyz delas dalsi iteraci.
+    
+2. Tech observables mas myslim skutecne zbytecne hodne. Sice to neni formalni problem, dokud spravne pouzivas [], ale je tam nejake overhead a hlavne se to blbe pise. Observables muzou zustat jenom kolem ploteni, jinak staci plain arrays. 
+V make_figure by sis napriklad udelala board_plot = Observable(b.board)a to potom predala do heatmap.
+    Aktualizace plotu je potom proste board_plot[] = b.board.
 
-Trochu slozitejsi strukturni vec, ale nastinim a pak kdyztak doresime.  Ve strukture Board by bylo lepsi nemit zadny observables, je to stav simulovanyho systemu, o zobrazeni a podobne nic nevi a vedet nemusi. Veci jako isrunningmuzou ve skutecnosti byt v make_figure, ty veci vytvoreny pomoci on jsou tzv. closures a zlvadnou to. Ale do toho se ted nema smysl zanorovat vic.
+? Trochu slozitejsi strukturni vec, ale nastinim a pak kdyztak doresime.  Ve strukture Board by bylo lepsi nemit zadny observables, je to stav simulovanyho systemu, o zobrazeni a podobne nic nevi a vedet nemusi. Veci jako isrunningmuzou ve skutecnosti byt v make_figure, ty veci vytvoreny pomoci on jsou tzv. closures a zlvadnou to. Ale do toho se ted nema smysl zanorovat vic.
 
-A posledni vec, ten simulaci krok je porad strasne slozitej, muze byt o dost jednodussi. Vubec nemusis delat to vlastni krokovani, staci reagovat na kazdej tick zobrazeni (frekvence je podle nastavenyho FPS, defaultne 30).
+4. A posledni vec, ten simulaci krok je porad strasne slozitej, muze byt o dost jednodussi. Vubec nemusis delat to vlastni krokovani, staci reagovat na kazdej tick zobrazeni (frekvence je podle nastavenyho FPS, defaultne 30).
 
 Zhruba takhle, osekanej priklad z myho kodu:
  
