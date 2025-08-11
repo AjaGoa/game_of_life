@@ -7,100 +7,79 @@ const CELL_SIZE = 40  # pixels per cell
 const GRID_PIXELS = g_size * CELL_SIZE
 
 mutable struct Board
-    board::Matrix{Bool}  # Observable for the board state
-    new_board::Matrix{Bool} # nebude delat bordel ye tady mam matrix a v board Observable?
-    gens::Int
-    s::Int # k pocitani generaci, aby spravne fungoval s/bez resetu
+    board::AbstractMatrix{Bool}
+    new_board::AbstractMatrix{Bool}
 end
 
 function new_board()
-    A = rand(Bool, g_size + 2, g_size + 2) 
-    #A[2:(g_size + 1), 2:(g_size + 1)] = rand(Bool, g_size, g_size) 
-    return A
+    A = OffsetArray(rand(Bool, g_size + 2, g_size + 2), 0:g_size + 1, 0:g_size + 1)
 end
 
-function initialize()
-    A = new_board()      
-
+function initialize()   
     return Board(
-        A, #board
-        falses(g_size + 2, g_size + 2), # new_board
-        5, # gens
-        0 # s 
+        new_board(), #board
+        new_board() # new_board
         )
-    end
+end
 
-    # v1 - no offset array
-function wrap_board(board::Matrix{Bool})
-    g = size(board, 1)  # g_size + 2
-    
+function wrap_board(board::AbstractMatrix{Bool})
+    g = size(board, 1) - 2 # g_size + 2
+
     # edges
-    board[1, 2:g - 1]   .= board[g-1, 2:g-1]   # top halo
-    board[g, 2:g-1] .= board[2, 2:g-1]   # bottom halo
-    board[2:g-1, 1]   .= board[2:g-1, g-1]   # left halo
-    board[2:g-1, g] .= board[2:g-1, 2]   # right halo
+    board[0,    1:g] .= board[g, 1:g]    # top halo
+    board[g+1,  1:g] .= board[1, 1:g]    # bottom halo
+    board[1:g,  0]   .= board[1:g, g]    # left halo
+    board[1:g, g+1]  .= board[1:g, 1]    # right halo
 
     # corners
-    board[1, 1]       = board[g-1, g-1]
-    board[1, g]     = board[g-1, 2]
-    board[g, 1]     = board[2, g-1]
-    board[g, g]   = board[2, 2]
+    board[0,    0]   = board[g, g]  # top-left corner
+    board[0,    g+1] = board[g, 1]  # top-right corner
+    board[g+1,  0]   = board[1, g]  # bottom-left corner
+    board[g+1, g+1]  = board[1, 1]  # bottom-right corner
 end
-# function print_board(b::Board)
-#     println("Next")
-#     for row in axes(b.board[], 1) # misto 1:size, hodi mi zrovna zacatek:konec
-#         for col in axes(b.board[], 2)
-#             print(b.board[][row, col] ? "■ " : "∙ ")
-#         end
-#         println()  # New line after each row
-#     end
-# end
 
-function next_generation!(b::Board) # ! tady by se dali passnout jenom board a new board
-    g = size(b.board, 1) 
-    wrap_board(b.board)  # wrap the board to handle edges
+function print_board(b::Matrix{Bool})
+    println("Next")
+    for row in axes(b, 1) # misto 1:size, hodi mi zrovna zacatek:konec
+        for col in axes(b, 2)
+            print(b[row, col] ? "■ " : "∙ ")
+        end
+        println()  # New line after each row
+    end
+end
 
-    for i in 2:(g-2), j in 2:(g-2)
-        neighbors = sum(b.board[i-1:i+1, j-1:j+1]) - b.board[i, j] # uz neni potreba nic checkovat
+function next_generation!(b::Board)
+    g = size(b.board, 1) - 2
+
+    for i in 1:g, j in 1:g
+        neighbors = sum(b.board[i-1:i+1, j-1:j+1]) - b.board[i, j]
 
         if neighbors == 3 || (b.board[i, j] && neighbors == 2)
             b.new_board[i, j] = true
         elseif b.board[i, j] && (neighbors < 2 || neighbors > 3) 
             b.new_board[i, j] = false
+        else
+            b.new_board[i, j] = false
         end
     end
+
     b.board, b.new_board = b.new_board, b.board # bez copy mi to jenom odkazuje na misto v pameti ale new_board, a to potom upravuju, takze tam bude delat bordel
 end
 
-# function gol(b::Board)
-#     # target checkuje ze mi run/stop nevytvori novou board/nezacne pocitat od zacatku
-#     target = b.gens + b.s
-#     if b.current_gen < target
-#         next_generation!(b)
-#         b.current_gen += 1
-#         #print_board(b)
-#         #sleep(b.delay)
-#     end
-#     if b.current_gen != 0 && (b.current_gen % target == 0)
-#         b.s += b.gens  # reset generation count when reaching target
-        
-#     end
-# end
-
 function make_figure(b::Board)
+    g = size(b.board, 1) - 2 
     
-    board_plot = Observable(b.board)
-    delay_plot = Observable(2.0)
-    gens_plot = Observable(b.gens)
-    isrunning_plot = Observable(false)
-    current_gen_plot = Observable(0)
+    # je lepsi mit promenne soucasti structu nebo funkce, kdyz je nidke mimo nepouzivam?
+    target = 0
+    stop_count = 0
+    delay_plot = 2.0
+    gens_plot = 5
     
-    target = b.gens
-
-    board_plot[] = b.board  
-    #delay_plot[] = b.delay
-    gens_plot[] = b.gens
-    #current_gen_plot[] = b.current_gen
+    isrunning_plot = Observable(false) 
+    current_gen_plot = Observable(0) # ve fig, pocitani generaci
+    board_plot = Observable(rand(Bool, g, g))
+    
+    board_plot[] .= b.board[1:g, 1:g]
     
     fig = Figure(size = (GRID_PIXELS + 200, GRID_PIXELS + 400))
     gl = GridLayout(fig[1, 1], alignmode = Outside())
@@ -126,22 +105,19 @@ function make_figure(b::Board)
     
     run_button = Button(fig[3, 1], label = lift(x -> x ? "Stop" : "Run", isrunning_plot)) # if x = true -> "Stop"
     reset_button = Button(fig[4, 1], label="Reset")
-
-    g = size(b.board, 1)
+    
     on(delay_slider.value) do value
-        #b.delay = value
-        delay_plot[] = value
+        delay_plot = value
     end
     
     on(gens_slider.value) do value
-        b.gens = value
-        gens_plot[] = value
+        gens_plot = value
     end
     
     on(run_button.clicks) do _
         isrunning_plot[] = !isrunning_plot[]
         if isrunning_plot[]
-            target = gens_plot[] + b.s
+            target = gens_plot + stop_count
         end
     end
     
@@ -149,26 +125,28 @@ function make_figure(b::Board)
         isrunning_plot[] || return # if not running, do nothing
         
         if current_gen_plot[] < target
+            wrap_board(b.board)  
             next_generation!(b)
             current_gen_plot[] += 1
 
             if current_gen_plot[] != 0 && (current_gen_plot[] % target == 0)
-                b.s += gens_plot[]  # reset generation count when reaching target
+                stop_count += gens_plot  # reset generation count when reaching target
                 isrunning_plot[] = false
             end
         end
-        board_plot[] = b.board
-        sleep(delay_plot[])  
+        board_plot[] = b.board[1:g, 1:g]
+        sleep(delay_plot)  
+        #print_board(board_plot[])
     end
 
     on(reset_button.clicks) do _
-        #b.isrunning = false
+    
         isrunning_plot[] = false
-        b.board = new_board()  
-        board_plot[] = b.board
+        b.board = new_board()
+        board_plot[] = b.board[1:g, 1:g]
 
         current_gen_plot[] = 0
-        b.s = 0
+        stop_count = 0
     end
     
     display(fig)
@@ -176,14 +154,3 @@ end
 
 init = initialize()
 make_figure(init)
-
-
-#= 
-checknout jestli mi funguje spravne plotovani - print_board, 
-vycistit - podivat na observables, 
-otazka ze jsem se jich nezbavila - jenom presunula ze struct do make_figure, potrebuju struct vubec jeste?
-je on(fig.tick) mozny jeste jednodussi ? - asi udelat solo funkci,
-
-na delay: nenasla jsem lepsi reseni nez sleep(), 
-tick.delta_time vypada ze je interni soucasti, pocitani s tim mi prislo jeste horsi ? - zeptat se Ondry, 
-udelat halo s offset arrays  =#

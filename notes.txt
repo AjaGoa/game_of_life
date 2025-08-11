@@ -71,3 +71,9 @@ Plain Text
 A potom uz ti staci butonkem nebo klavesou menit stav toho running. Delay neni potreba, tick se emituje pri kazdym prekresleni.
 
 Cela ta slozitost v gol neni potreba. Jestli chces pocitat snimky nebo neco dalsiho, provedes to v tomcallbacku, co ukazuju.
+
+
+na delay: nenasla jsem lepsi reseni nez sleep(), 
+tick.delta_time vypada ze je interni soucasti, pocitani s tim mi prislo jeste horsi ? - zeptat se Ondry
+
+zkusit halo bez ghost cells
