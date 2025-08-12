@@ -7,12 +7,12 @@ const CELL_SIZE = 40  # pixels per cell
 const GRID_PIXELS = g_size * CELL_SIZE
 
 mutable struct Board
-    board::AbstractMatrix{Bool}
-    new_board::AbstractMatrix{Bool}
+    board::Matrix{Bool}
+    new_board::Matrix{Bool}
 end
 
 function new_board()
-    A = OffsetArray(rand(Bool, g_size + 2, g_size + 2), 0:g_size + 1, 0:g_size + 1)
+    A = rand(Bool, g_size, g_size)
 end
 
 function initialize()   
@@ -20,22 +20,6 @@ function initialize()
         new_board(), #board
         new_board() # new_board
         )
-end
-
-function wrap_board(board::AbstractMatrix{Bool})
-    g = size(board, 1) - 2 # g_size + 2
-
-    # edges
-    board[0,    1:g] .= board[g, 1:g]    # top halo
-    board[g+1,  1:g] .= board[1, 1:g]    # bottom halo
-    board[1:g,  0]   .= board[1:g, g]    # left halo
-    board[1:g, g+1]  .= board[1:g, 1]    # right halo
-
-    # corners
-    board[0,    0]   = board[g, g]  # top-left corner
-    board[0,    g+1] = board[g, 1]  # top-right corner
-    board[g+1,  0]   = board[1, g]  # bottom-left corner
-    board[g+1, g+1]  = board[1, 1]  # bottom-right corner
 end
 
 function print_board(b::Matrix{Bool})
@@ -49,25 +33,32 @@ function print_board(b::Matrix{Bool})
 end
 
 function next_generation!(b::Board)
-    g = size(b.board, 1) - 2
+    g = size(b.board, 1)
 
     for i in 1:g, j in 1:g
-        neighbors = sum(b.board[i-1:i+1, j-1:j+1]) - b.board[i, j]
+        neighbors = 0
+        for di in -1:1, dj in -1:1
+            if di != 0 || dj != 0 # vynechani [i, j]
+                ni = mod1(i + di, g)  # row
+                nj = mod1(j + dj, g)  # col
+                neighbors += b.board[ni, nj]
+            end
+        end
 
         if neighbors == 3 || (b.board[i, j] && neighbors == 2)
-            b.new_board[i, j] = true
-        elseif b.board[i, j] && (neighbors < 2 || neighbors > 3) 
-            b.new_board[i, j] = false
-        else
-            b.new_board[i, j] = false
-        end
+             b.new_board[i, j] = true
+         elseif b.board[i, j] && (neighbors < 2 || neighbors > 3) 
+             b.new_board[i, j] = false
+         else
+             b.new_board[i, j] = false
+         end
     end
 
-    b.board, b.new_board = b.new_board, b.board # bez copy mi to jenom odkazuje na misto v pameti ale new_board, a to potom upravuju, takze tam bude delat bordel
+    b.board, b.new_board = b.new_board, b.board
 end
 
 function make_figure(b::Board)
-    g = size(b.board, 1) - 2 
+    g = size(b.board, 1) 
     
     # je lepsi mit promenne soucasti structu nebo funkce, kdyz je nidke mimo nepouzivam?
     target = 0
@@ -75,7 +66,7 @@ function make_figure(b::Board)
     delay_plot = 2.0
     gens_plot = 5
     last_update = 0.0
-    
+
     isrunning_plot = Observable(false) 
     current_gen_plot = Observable(0) # ve fig, pocitani generaci
     board_plot = Observable(rand(Bool, g, g))
@@ -125,9 +116,8 @@ function make_figure(b::Board)
     on(fig.scene.events.tick) do _
         isrunning_plot[] || return # if not running, do nothing
         
-        now = time()
-        if (current_gen_plot[] < target) && (now - last_update >= delay_plot)            
-            wrap_board(b.board)  
+        now = time() # https://www.jlhub.com/julia/manual/en/function/time
+        if (current_gen_plot[] < target) && (now - last_update >= delay_plot)
             next_generation!(b)
             current_gen_plot[] += 1
 
@@ -135,12 +125,11 @@ function make_figure(b::Board)
                 stop_count += gens_plot  # reset generation count when reaching target
                 isrunning_plot[] = false
             end
+            print_board(board_plot[])
             last_update = now
         end
         board_plot[] = b.board[1:g, 1:g]
-        # je jiny zpusob jak kontrolovat rychlost, tick.delta_time asi menit nemuzu?, FPS asi menit nemuzu, pokud nepouzivam record?
-        #sleep(delay_plot)  
-        #print_board(board_plot[])
+        #sleep(delay_plot)  - time() je asi lepsi? - sleep blokne task (https://www.jlhub.com/julia/manual/en/function/sleep) 
     end
 
     on(reset_button.clicks) do _
