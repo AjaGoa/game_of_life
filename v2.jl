@@ -55,6 +55,9 @@ function next_generation!(b::Board)
     end
 
     b.board, b.new_board = b.new_board, b.board
+
+    # mod = % - vysledek v rozmezi 0:m-1
+    # mod1 - % vysledek v rozmezi 1:m
 end
 
 function make_figure(b::Board)
@@ -120,6 +123,7 @@ function make_figure(b::Board)
         if (current_gen_plot[] < target) && (now - last_update >= delay_plot)
             next_generation!(b)
             current_gen_plot[] += 1
+            board_plot[] = b.board[1:g, 1:g]
 
             if current_gen_plot[] != 0 && (current_gen_plot[] % target == 0)
                 stop_count += gens_plot  # reset generation count when reaching target
@@ -128,7 +132,6 @@ function make_figure(b::Board)
             print_board(board_plot[])
             last_update = now
         end
-        board_plot[] = b.board[1:g, 1:g]
         #sleep(delay_plot)  - time() je asi lepsi? - sleep blokne task (https://www.jlhub.com/julia/manual/en/function/sleep) 
     end
 

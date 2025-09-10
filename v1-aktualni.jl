@@ -2,40 +2,46 @@ using GLMakie
 using Random
 using OffsetArrays
 
-const g_size = 10
-const CELL_SIZE = 40  # pixels per cell
-const GRID_PIXELS = g_size * CELL_SIZE
+# const g_size = 10
+# const CELL_SIZE = 40  # pixels per cell
+# const GRID_PIXELS = g_size * CELL_SIZE
 
 mutable struct Board
     board::AbstractMatrix{Bool}
     new_board::AbstractMatrix{Bool}
+    g_size::Int
+    CELL_SIZE::Int
+    GRID_PIXELS::Int
 end
 
-function new_board()
+function new_board(g_size::Int)
     A = OffsetArray(rand(Bool, g_size + 2, g_size + 2), 0:g_size + 1, 0:g_size + 1)
 end
 
 function initialize()   
     return Board(
-        new_board(), #board
-        new_board() # new_board
+        OffsetArray(rand(Bool, 10 + 2, 10 + 2), 0:(10 + 1), 0:(10 + 1)), #board
+        OffsetArray(rand(Bool, 10 + 2, 10 + 2), 0:(10 + 1), 0:(10 + 1)), # new_board)
+        10, # g_size
+        40, # CELL_SIZE
+        400 # GRID_PIXELS (g_size * CELL_SIZE)
         )
 end
 
-function wrap_board(board::AbstractMatrix{Bool})
-    g = size(board, 1) - 2 # g_size + 2
+function wrap_board(board::AbstractMatrix{Bool}, g_size::Int)
+    # g = g_size # g_size + 2
 
     # edges
-    board[0,    1:g] .= board[g, 1:g]    # top halo
-    board[g+1,  1:g] .= board[1, 1:g]    # bottom halo
-    board[1:g,  0]   .= board[1:g, g]    # left halo
-    board[1:g, g+1]  .= board[1:g, 1]    # right halo
+    board[0,    1:g_size] .= board[g_size, 1:g_size]    # top halo
+    board[g_size+1,  1:g_size] .= board[1, 1:g_size]    # bottom halo
+    board[1:g_size,  0]   .= board[1:g_size, g_size]    # left halo
+    board[1:g_size, g_size+1]  .= board[1:g_size, 1]    # right halo
 
     # corners
-    board[0,    0]   = board[g, g]  # top-left corner
-    board[0,    g+1] = board[g, 1]  # top-right corner
-    board[g+1,  0]   = board[1, g]  # bottom-left corner
-    board[g+1, g+1]  = board[1, 1]  # bottom-right corner
+    board[0,    0]   = board[g_size, g_size]  # top-left corner
+    board[0,    g_size+1] = board[g_size, 1]  # top-right corner
+    board[g_size+1,  0]   = board[1, g_size]  # bottom-left corner
+    board[g_size+1, g_size+1]  = board[1, 1]  # bottom-right corner
 end
 
 function print_board(b::Matrix{Bool})
@@ -49,9 +55,8 @@ function print_board(b::Matrix{Bool})
 end
 
 function next_generation!(b::Board)
-    g = size(b.board, 1) - 2
-
-    for i in 1:g, j in 1:g
+    
+    for i in 1:b.g_size, j in 1:b.g_size
         neighbors = sum(b.board[i-1:i+1, j-1:j+1]) - b.board[i, j]
 
         if neighbors == 3 || (b.board[i, j] && neighbors == 2)
@@ -67,9 +72,8 @@ function next_generation!(b::Board)
 end
 
 function make_figure(b::Board)
-    g = size(b.board, 1) - 2 
-    
-    # je lepsi mit promenne soucasti structu nebo funkce, kdyz je nidke mimo nepouzivam?
+
+    # ? je lepsi mit promenne soucasti structu nebo funkce, kdyz je nidke mimo nepouzivam?
     target = 0
     stop_count = 0
     delay_plot = 2.0
@@ -78,11 +82,11 @@ function make_figure(b::Board)
     
     isrunning_plot = Observable(false) 
     current_gen_plot = Observable(0) # ve fig, pocitani generaci
-    board_plot = Observable(rand(Bool, g, g))
+    board_plot = Observable(rand(Bool, b.g_size, b.g_size))
     
-    board_plot[] .= b.board[1:g, 1:g]
+    board_plot[] .= b.board[1:b.g_size, 1:b.g_size]
     
-    fig = Figure(size = (GRID_PIXELS + 200, GRID_PIXELS + 400))
+    fig = Figure(size = (b.GRID_PIXELS + 200, b.GRID_PIXELS + 400))
     gl = GridLayout(fig[1, 1], alignmode = Outside())
     ax = Axis(gl[1, 1], 
     aspect = DataAspect(),
@@ -90,8 +94,8 @@ function make_figure(b::Board)
     xticklabelsvisible = false, yticklabelsvisible = false,
     xticksvisible = false, yticksvisible = false)
         
-    colsize!(gl, 1, Fixed(GRID_PIXELS))
-    rowsize!(gl, 1, Fixed(GRID_PIXELS))
+    colsize!(gl, 1, Fixed(b.GRID_PIXELS))
+    rowsize!(gl, 1, Fixed(b.GRID_PIXELS))
     
     hm = heatmap!(ax, board_plot, colormap = [:black, :white], colorrange = (0, 1))
     
@@ -127,34 +131,47 @@ function make_figure(b::Board)
         
         now = time()
         if (current_gen_plot[] < target) && (now - last_update >= delay_plot)            
-            wrap_board(b.board)  
+            wrap_board(b.board, b.g_size)  
             next_generation!(b)
             current_gen_plot[] += 1
-
+            
             if current_gen_plot[] != 0 && (current_gen_plot[] % target == 0)
                 stop_count += gens_plot  # reset generation count when reaching target
                 isrunning_plot[] = false
             end
+            board_plot[] = b.board[1:b.g_size, 1:b.g_size]
             last_update = now
+            print_board(board_plot[])
         end
-        board_plot[] = b.board[1:g, 1:g]
-        # je jiny zpusob jak kontrolovat rychlost, tick.delta_time asi menit nemuzu?, FPS asi menit nemuzu, pokud nepouzivam record?
+        # ? je jiny zpusob jak kontrolovat rychlost, tick.delta_time asi menit nemuzu?, FPS asi menit nemuzu, pokud nepouzivam record?
         #sleep(delay_plot)  
-        #print_board(board_plot[])
     end
 
     on(reset_button.clicks) do _
     
         isrunning_plot[] = false
-        b.board = new_board()
-        board_plot[] = b.board[1:g, 1:g]
+        b.board = new_board(b.g_size)
+        board_plot[] = b.board[1:b.g_size, 1:b.g_size]
 
         current_gen_plot[] = 0
         stop_count = 0
     end
     
+    on(ax.scene.events.mousebutton) do buttons
+    if buttons.button == Mouse.left && buttons.action == Mouse.press
+        pos = mouseposition(ax)
+        i, j = floor.(Int, pos) # rounding to Int
+        if 1 ≤ i ≤ b.g_size && 1 ≤ j ≤ b.g_size
+            b.board[i, j] = !b.board[i, j]
+            board_plot[] = b.board[1:b.g_size, 1:b.g_size]
+        end
+    end
+    end
+
     display(fig)
 end
 
 init = initialize()
 make_figure(init)
+# step buttonek
+# TODO upravit mouse aby fungovala idelane ve stredu ne v pravem hronim rohu
