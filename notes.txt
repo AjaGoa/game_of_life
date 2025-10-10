@@ -77,3 +77,11 @@ na delay: nenasla jsem lepsi reseni nez sleep(),
 tick.delta_time vypada ze je interni soucasti, pocitani s tim mi prislo jeste horsi ? - zeptat se Ondry
 
 zkusit halo bez ghost cells
+
+
+notes 3: 
+
+radsi nekopirovat, ne vic verzi
+
+zkusit AI editor - special okno 
+git tutorialy 
