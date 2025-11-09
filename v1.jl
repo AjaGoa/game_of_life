@@ -7,6 +7,11 @@ using OffsetArrays
 # ruzne druhy konstruktoru: https://docs.julialang.org/en/v1/manual/constructors/
 # https://www.geeksforgeeks.org/dsa/stack-vs-heap-memory-allocation/
 
+# notify(data)   # OM: ???
+#!? data_obs[] = board.board  - obcas po resetu / clearu se po run spusti ta puvodni generace, ale je to pomerne nahodne, coz je divne
+# u notify(data_obs) - u resetu/crearu po zmacknuti buttonku neplotne novou matici
+# suggest fixu od gemini je v commentu v next_generation! - nvm proc by ale melo byt potraba dalsi view
+
 const DEFAULT_FRAMERATE = 15.0
 
 GLMakie.activate!(framerate = DEFAULT_FRAMERATE)
@@ -14,59 +19,39 @@ GLMakie.activate!(framerate = DEFAULT_FRAMERATE)
 mutable struct Board
     _board::OffsetArray{Bool, 2}
     _new_board::OffsetArray{Bool, 2}
-    board::SubArray{Bool, 2}  # vyborne takze to nebylo v SubArray - ? asi nesedel typ nekde pozdeji ale proc pomohla zmena na obecnejsi
+    board::SubArray{Bool, 2}
 end
 
 function Board(x::Int, y::Int)
-    _board = OffsetArray(rand(Bool, x + 2, y + 2), 0:x + 1, 0:y + 1)
+    _board = OffsetArray(falses(x + 2, y + 2), 0:x + 1, 0:y + 1)
     _new_board = similar(_board)
     board = @view _board[1:x, 1:y]
-    Board(_board, _new_board, board)
+
+    b = Board(_board, _new_board, board)
+    reset!(b)
+    return b
 end
 
 # getproperty
 
-function reset!(b::Board)
-    x, y = size(b._board)
-    #? b._board .= rand(Bool) <- nejde protoze broadcastuje jenom jednu random hodnotu 
-    new_data = OffsetArray(rand(Bool, x, y), axes(b._board)) # urcite existuje neco lepsiho, urcite muzu zamichat jenom viditelnou cast, zbytek stejne kopiruju, ale to by se mi zas neprepsalo do vypoctu 
-    b._board .= new_data
-    b.board .= @view b._board[1:x-2, 1:y-2] # bez @view zlobi spusteni po clear/resetu
-    # taky bych to mohla zrovna posunout do data[], ale otazka jestli by to pak nebylo zpatenejsi
-end 
+Base.size(b::Board) = size(b.board) # Q <- vlastne asi nechapu, proc je lepsi vytvaret si fci, ktere passnu cely struct, kdyz primo muzu vyuzit konkretni s konkretnim imputem
 
-function clear!(b::Board)
-    x, y = size(b._board) .- 2
-    b._board .= false
-    b.board .= @view b._board[1:x, 1:y]
-end
+reset!(b::Board) = b.board .= rand(Bool, size(b.board))
+#(VS b._board .= rand(Bool) broadcastuje jenom jednu random hodnotu)
 
-# OM: to by mohla byt proste `Figure`, nebo `GameOfLifeFigure` nebo tak neco, viz dal
-mutable struct FigureParams
+clear!(b::Board) = b._board .= false 
+
+mutable struct GameOfLife
+    board::Board
     isrunning::Observable{Bool}
     current_gen::Observable{Int} # ve fig, pocitani generaci
-    # OM: trochu pedantsky, ale tohle je vlastnost simulace, takze nesouvisi primo s figurkou. ale cely je to dost jednoduchy na to, aby to nevadilo
-    # OM: naopak bych tady mozna pridal tu samotnou figure, at je to proste celky prohromade. ten `make_figure` by pak mohl bejt konstruktor
-end
-# OM
-# Dalsi moznost je, ze na to zadnou strukturu delat nebudu, vyrobim jenom Makie Figure a vsechno delam pres ni, ono je to tam schovany.
-# Ale tohle je docela cisty a pohodlny, ulozim si k primimu pristupu par veci, co se mi hodi.
-
-function FigureParams()
-    isrunning = Observable(false)
-    current_gen = Observable(0)
-
-    return FigureParams(isrunning, current_gen) #board_plot)
+    data_obs::Observable{SubArray{Bool, 2}}
+    figure::Figure
 end
 
-function wrap_board!(board::OffsetArray{Bool})
-    x = last(axes(board, 1)) - 1  # rows - da mi posledni (posunuty) index z OffsetArray 
-    y = last(axes(board, 2)) - 1  # cols
+function wrap_board!(board::OffsetArray{Bool}, x::Int, y::Int) #!
 
-    # OM
-    # - Tady je dopad na vykon zanedbatelny, ale chapat views je dulezite.
-    # - K diskuzi - pouziti spawn.
-    # edges
+    # OM - K diskuzi - pouziti spawn.
     # @views - pro blok, @view pro jeden vyraz
     @views begin
         board[0  , 1:y] .= board[x  , 1:y]   # top halo
@@ -95,75 +80,82 @@ function print_board(b::OffsetArray{Bool})
 end
 
 function next_generation!(b::Board)
-    x, y = size(b.board)
+    x, y = size(b)
 
-    wrap_board!(b._board)
+    wrap_board!(b._board, x, y)
     for i in 1:x, j in 1:y
         neighbors = sum(b._board[i-1:i+1, j-1:j+1]) - b._board[i, j]
         b._new_board[i, j] = (neighbors == 3 || (b._board[i, j] && neighbors == 2))
     end
     b._board, b._new_board = b._new_board, b._board # bez copy mi to jenom odkazuje na misto v pameti ale new_board, a to potom upravuju, takze tam bude delat bordel
+    #b.board = @view b._board[1:x, 1:y] #GEMINI (i Chat):- apparently still pointing to "old memory" ?? 
 end
 
-toggle_running!(fp::FigureParams) = fp.isrunning[] = !fp.isrunning[]
 
-function make_figure(b::Board, fp::FigureParams)
-    x, y = size(b.board)
-
-    fig = Figure(size = (700, 700)) # lepsi pouzit dynamickou velikost cells
-    gl = GridLayout(fig[1, 1], alignmode = Outside())
+function GameOfLife(x::Int, y::Int)
+    #konstruktor
+    board = Board(x, y)
+    isrunning = Observable(false)
+    current_gen = Observable(0)
+    data_obs = Observable(board.board)
+    
+    figure = Figure(size = (700, 700))
+    gl = GridLayout(figure[1, 1], alignmode = Outside())
     ax = Axis(gl[1, 1], # span (1.0, 10.0) , here set up automatically based on the data I put in (board_plot), but can be set manually
-        aspect = DataAspect(),
+    aspect = DataAspect(),
         title = "Game of Life",
         xticklabelsvisible = false, yticklabelsvisible = false,
         xticksvisible = false, yticksvisible = false)
-    colsize!(gl, 1, Fixed(400)) 
-    rowsize!(gl, 1, Fixed(400))
-    empty!(ax.interactions)
+        colsize!(gl, 1, Fixed(400)) 
+        rowsize!(gl, 1, Fixed(400))
+        empty!(ax.interactions)
 
-    data = Observable(@view b.board[1:x, 1:y])
-    hm = heatmap!(ax, data, colormap = [:black, :white], colorrange = (0, 1))
+    toggle_running!() = isrunning[] = !isrunning[]
 
-    gen_label = Label(fig[2, 1], lift(n -> "Generation No.: $n", fp.current_gen))
+    hm = heatmap!(ax, data_obs, colormap = [:black, :white], colorrange = (0, 1))
 
-    run_button = Button(fig[3, 1], label = lift(x -> x ? "Stop" : "Run", fp.isrunning)) # if x = true -> "Stop"
-    reset_button = Button(fig[4, 1], label="Reset")
-    clear_button = Button(fig[5, 1], label="Clear")
+    gen_label = Label(figure[2, 1], lift(n -> "Generation No.: $n", current_gen))
+
+    run_button = Button(figure[3, 1], label = lift(x -> x ? "Stop" : "Run", isrunning)) # if x = true -> "Stop"
+    reset_button = Button(figure[4, 1], label="Reset")
+    clear_button = Button(figure[5, 1], label="Clear")
 
     on(run_button.clicks) do _
-        toggle_running!(fp)
+        toggle_running!()
     end
 
     on(ax.scene.events.keyboardbutton) do event
         if event.action == Keyboard.press && event.key == Keyboard.space
-            toggle_running!(fp)
+            toggle_running!()
         end
     end
     # nesel by ten button a keyboard sloucit do jednoho eventu ?
     # OM: To ne, jsou to dva ruzny triggery. Pokud je ale opakovanej kod v tom callbacku, muzu ho vytahnout do funkce, kterou pak volam z tech vic mist.
 
-    on(fig.scene.events.tick) do _
-        fp.isrunning[] || return # if not running, do nothing
+    on(figure.scene.events.tick) do _
+        isrunning[] || return # if not running, do nothing
 
-        next_generation!(b)
-        fp.current_gen[] += 1
-        data[] = @view b.board[1:x, 1:y] # nebo data[] .= b.board[1:x, 1:y]
-        # OM: view je myslim lepsi, ale urcite to neni nutny. taky by se teda nemusel porad vytvaret, muzeme si ho ulozit
+        next_generation!(board)
+        current_gen[] += 1
+        #notify(data_obs)
+        data_obs[] = board.board
         #print_board(fp.board_plot[])
     end
 
     on(reset_button.clicks) do _
-        fp.isrunning[] = false
-        reset!(b)
-        data[] = @view b.board[1:x, 1:y]
-        fp.current_gen[] = 0
+        isrunning[] = false
+        reset!(board)
+        current_gen[] = 0
+        #notify(data_obs)
+        data_obs[] = board.board
     end
 
     on(clear_button.clicks) do _
-        fp.isrunning[] = false
-        clear!(b) # proc se mi ta cista zobrazi az potom co spustim dalsi generaci ? (pokud zrovna neupdatuju do b.board)         
-        fp.current_gen[] = 0
-        data[] = @view b.board[1:x, 1:y] # nemelo by mi to tady zrovna triggnout ten plot do heatmap ?
+        isrunning[] = false
+        clear!(board)         
+        current_gen[] = 0
+        #notify(data_obs)
+        data_obs[] = board.board
     end
 
     on(ax.scene.events.mousebutton) do buttons
@@ -172,22 +164,25 @@ function make_figure(b::Board, fp::FigureParams)
         if buttons.button == Mouse.left && buttons.action == Mouse.press
             pos = mouseposition(ax) # cursor position in axis units (not the full window)
             i, j = round.(Int, pos) # rounding to Int
-            # OM: hezky pouziti Unicode :-)
+        
             if 1 ≤ i ≤ x && 1 ≤ j ≤ y
-                b.board[i, j] = !b.board[i, j]
-                data[] = @view b.board[1:x, 1:y]
+                board.board[i, j] = !board.board[i, j]
+                #notify(data_obs)
+                data_obs[] = board.board
             end
         end
     end
-    display(fig)
-    # OM: myslim nemusi byt 
+    return GameOfLife(board, isrunning, current_gen, data_obs, figure)
 end
 
 function main()
-    b = Board(50, 50)
-    fp = FigureParams()
-    make_figure(b, fp)
+    game = GameOfLife(50, 50)
+    display(game.figure)
 end
 
-# OM: main je normalne bez argumentu, tohle by byl spis nejakej `run`, co se z toho main (nebo treba interaktivne z REPLu) zavola
-main()  
+function run(x::Int = 50, y::Int = 50)
+    game = GameOfLife(x, y)
+    display(game.figure)
+end
+
+main() 
