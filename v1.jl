@@ -20,26 +20,33 @@ mutable struct Board
     _board::OffsetArray{Bool, 2}
     _new_board::OffsetArray{Bool, 2}
     board::SubArray{Bool, 2}
+    _new_board_view::SubArray{Bool, 2}
 end
 
 function Board(x::Int, y::Int)
     _board = OffsetArray(falses(x + 2, y + 2), 0:x + 1, 0:y + 1)
     _new_board = similar(_board)
     board = @view _board[1:x, 1:y]
+    _new_board_view = @view _new_board[1:x, 1:y]
 
-    b = Board(_board, _new_board, board)
+    b = Board(_board, _new_board, board, _new_board_view)
     reset!(b)
     return b
 end
 
 # getproperty
 
-Base.size(b::Board) = size(b.board) # Q <- vlastne asi nechapu, proc je lepsi vytvaret si fci, ktere passnu cely struct, kdyz primo muzu vyuzit konkretni s konkretnim imputem
+Base.size(b::Board) = size(b.board) 
 
 reset!(b::Board) = b.board .= rand(Bool, size(b.board))
 #(VS b._board .= rand(Bool) broadcastuje jenom jednu random hodnotu)
 
 clear!(b::Board) = b._board .= false 
+
+function swap!(b::Board)
+    b._board, b._new_board = b._new_board, b._board
+    b.board, b._new_board_view = b._new_board_view, b.board
+end
 
 mutable struct GameOfLife
     board::Board
@@ -49,7 +56,7 @@ mutable struct GameOfLife
     figure::Figure
 end
 
-function wrap_board!(board::OffsetArray{Bool}, x::Int, y::Int) #!
+function wrap_board!(board::OffsetArray{Bool}, x::Int, y::Int) 
 
     # OM - K diskuzi - pouziti spawn.
     # @views - pro blok, @view pro jeden vyraz
@@ -87,10 +94,8 @@ function next_generation!(b::Board)
         neighbors = sum(b._board[i-1:i+1, j-1:j+1]) - b._board[i, j]
         b._new_board[i, j] = (neighbors == 3 || (b._board[i, j] && neighbors == 2))
     end
-    b._board, b._new_board = b._new_board, b._board # bez copy mi to jenom odkazuje na misto v pameti ale new_board, a to potom upravuju, takze tam bude delat bordel
-    #b.board = @view b._board[1:x, 1:y] #GEMINI (i Chat):- apparently still pointing to "old memory" ?? 
+    swap!(b)
 end
-
 
 function GameOfLife(x::Int, y::Int)
     #konstruktor
@@ -101,16 +106,25 @@ function GameOfLife(x::Int, y::Int)
     
     figure = Figure(size = (700, 700))
     gl = GridLayout(figure[1, 1], alignmode = Outside())
-    ax = Axis(gl[1, 1], # span (1.0, 10.0) , here set up automatically based on the data I put in (board_plot), but can be set manually
-    aspect = DataAspect(),
+    ax = Axis(
+        gl[1, 1], # span (1.0, 10.0) , here set up automatically based on the data I put in (board_plot), but can be set manually
+        aspect = DataAspect(),
         title = "Game of Life",
         xticklabelsvisible = false, yticklabelsvisible = false,
-        xticksvisible = false, yticksvisible = false)
-        colsize!(gl, 1, Fixed(400)) 
-        rowsize!(gl, 1, Fixed(400))
-        empty!(ax.interactions)
+        xticksvisible = false, yticksvisible = false
+    )
+    colsize!(gl, 1, Fixed(800)) 
+    rowsize!(gl, 1, Fixed(800))
+    # flexibilni velikost bunky/heatmap vzhledem k velikosti okna
+    empty!(ax.interactions)
 
+    # closure
     toggle_running!() = isrunning[] = !isrunning[]
+
+    toggle_running!()
+    
+    # VS
+    toggle_running!(isrunning::Observable{Bool}) = isrunning[] = !isrunning[]
 
     hm = heatmap!(ax, data_obs, colormap = [:black, :white], colorrange = (0, 1))
 
@@ -119,14 +133,16 @@ function GameOfLife(x::Int, y::Int)
     run_button = Button(figure[3, 1], label = lift(x -> x ? "Stop" : "Run", isrunning)) # if x = true -> "Stop"
     reset_button = Button(figure[4, 1], label="Reset")
     clear_button = Button(figure[5, 1], label="Clear")
-
+    # buttonky vedle sebe - hstack
     on(run_button.clicks) do _
         toggle_running!()
     end
 
     on(ax.scene.events.keyboardbutton) do event
         if event.action == Keyboard.press && event.key == Keyboard.space
-            toggle_running!()
+            next_generation!(board)
+            current_gen[] += 1
+            data_obs[] = board.board
         end
     end
     # nesel by ten button a keyboard sloucit do jednoho eventu ?
@@ -137,7 +153,6 @@ function GameOfLife(x::Int, y::Int)
 
         next_generation!(board)
         current_gen[] += 1
-        #notify(data_obs)
         data_obs[] = board.board
         #print_board(fp.board_plot[])
     end
@@ -146,7 +161,6 @@ function GameOfLife(x::Int, y::Int)
         isrunning[] = false
         reset!(board)
         current_gen[] = 0
-        #notify(data_obs)
         data_obs[] = board.board
     end
 
@@ -154,7 +168,6 @@ function GameOfLife(x::Int, y::Int)
         isrunning[] = false
         clear!(board)         
         current_gen[] = 0
-        #notify(data_obs)
         data_obs[] = board.board
     end
 
@@ -167,7 +180,6 @@ function GameOfLife(x::Int, y::Int)
         
             if 1 ≤ i ≤ x && 1 ≤ j ≤ y
                 board.board[i, j] = !board.board[i, j]
-                #notify(data_obs)
                 data_obs[] = board.board
             end
         end
